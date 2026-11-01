@@ -3,9 +3,9 @@
   "version": "2.4.0",
   "download_url": "https://github.com/huangweif522-star/plugins/releases/download/v2.4.0/MGImagine_short_drama_v2.4.0.zip",
   "sha256": "477cf9fda66e6ca7fd820b43c82cd5d207898581a5f26e3ae7cd99b169258252",
-  "notes": "修复服务器已出片但无法下载返回的问题，兼容MG官方下载地址及代理DNS。顶部仅显示版本，底部提供检查更新、下载并更新。v2.3.0可直接在线升级，下载后等任务结束，退出所有字字动画窗口并重启。新装选择MG插件_v2.4.0.zip，在线升级沿用原目录及配置。",
+  "notes": "修复服务器已出片但无法下载返回的问题，兼容MG官方下载地址及代理DNS。顶部仅显示版本，底部提供检查更新、下载并更新。v2.3.0可直接在线升级，下载后等任务结束，退出所有字字动画窗口并重启。新装选择MG插件安装包，在线升级沿用原目录及配置。",
   "manual_package": {
-    "filename": "MG插件_v2.4.0.zip",
+    "filename": "MG_plugin_v2.4.0.zip",
     "sha256": "5cc230aced39a658aea3ff203d32b7c41142e1d38df1572c793d9d015456a381"
   }
 }

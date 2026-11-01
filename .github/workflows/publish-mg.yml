@@ -47,6 +47,17 @@ jobs:
           with zipfile.ZipFile(io.BytesIO(package)) as archive:
               assert archive.testzip() is None
               assert json.loads(archive.read('MGImagine_short_drama_v2_0/info.json'))['version'] == v
+          manual = data.get('manual_package')
+          manual_bytes = None
+          if manual:
+              assert manual['filename'] == 'MG插件_v' + v + '.zip'
+              manual_bytes = base64.b64decode((source.parent / (manual['filename'] + '.base64')).read_bytes(), validate=True)
+              assert hashlib.sha256(manual_bytes).hexdigest() == manual['sha256']
+              with zipfile.ZipFile(io.BytesIO(manual_bytes)) as manual_zip, zipfile.ZipFile(io.BytesIO(package)) as update_zip:
+                  assert manual_zip.testzip() is None
+                  left = {n.removeprefix('MG插件/'):manual_zip.read(n) for n in manual_zip.namelist()}
+                  right = {n.removeprefix('MGImagine_short_drama_v2_0/'):update_zip.read(n) for n in update_zip.namelist()}
+                  assert left == right, 'Manual and online package contents differ'
           def gh(*args):
               return subprocess.run(['gh', 'release', *args], check=True, text=True, capture_output=True)
           existing = subprocess.run(['gh','release','view',tag,'--json','isDraft'], text=True, capture_output=True)
@@ -57,9 +68,13 @@ jobs:
               out = pathlib.Path(folder)
               (out / filename).write_bytes(package)
               (out / 'latest.json').write_bytes(source.read_bytes())
+              attachments = [str(out / filename), str(out / 'latest.json')]
+              if manual_bytes is not None:
+                  (out / manual['filename']).write_bytes(manual_bytes)
+                  attachments.append(str(out / manual['filename']))
               (out / 'notes.txt').write_text(data.get('notes', ''), encoding='utf-8')
               if existing.returncode != 0:
-                  gh('create',tag,'--draft','--target',os.environ['GITHUB_SHA'],'--title','MG 短剧视频 ' + tag,'--notes-file',str(out/'notes.txt'))
-              gh('upload',tag,str(out/filename),str(out/'latest.json'),'--clobber')
+                  gh('create',tag,'--draft','--target',os.environ['GITHUB_SHA'],'--title','MG插件 ' + tag,'--notes-file',str(out/'notes.txt'))
+              gh('upload',tag,*attachments,'--clobber')
               gh('edit',tag,'--draft=false','--latest')
               print('Published ' + tag + ' with verified ZIP and latest.json')

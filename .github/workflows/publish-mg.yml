@@ -1,0 +1,65 @@
+name: Publish MG plugin
+
+on:
+  push:
+    branches: [main]
+    paths: ['release-assets/**/latest.json']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mg-plugin-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish release attachments
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: python
+        run: |
+          import base64, hashlib, io, json, os, pathlib, re, subprocess, tempfile, zipfile
+          root = pathlib.Path('release-assets')
+          manifests = list(root.glob('v*/latest.json'))
+          def version(path):
+              value = path.parent.name.removeprefix('v')
+              if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', value):
+                  raise ValueError('Invalid release version')
+              return tuple(map(int, value.split('.')))
+          source = max(manifests, key=version)
+          data = json.loads(source.read_bytes())
+          v = data['version']
+          tag = 'v' + v
+          filename = 'MGImagine_short_drama_v' + v + '.zip'
+          expected = 'https://github.com/' + os.environ['GH_REPO'] + '/releases/download/' + tag + '/' + filename
+          assert source.parent.name == tag and data['download_url'] == expected
+          assert data['plugin'] == 'MGImagine_short_drama_v2_0'
+          package = base64.b64decode((source.parent / (filename + '.base64')).read_bytes(), validate=True)
+          assert len(package) <= 16 * 1024 * 1024
+          assert hashlib.sha256(package).hexdigest() == data['sha256'], 'SHA-256 mismatch'
+          with zipfile.ZipFile(io.BytesIO(package)) as archive:
+              assert archive.testzip() is None
+              assert json.loads(archive.read('MGImagine_short_drama_v2_0/info.json'))['version'] == v
+          def gh(*args):
+              return subprocess.run(['gh', 'release', *args], check=True, text=True, capture_output=True)
+          existing = subprocess.run(['gh','release','view',tag,'--json','isDraft'], text=True, capture_output=True)
+          if existing.returncode == 0 and not json.loads(existing.stdout)['isDraft']:
+              print(tag + ' is already published. Published attachments are preserved.')
+              raise SystemExit(0)
+          with tempfile.TemporaryDirectory() as folder:
+              out = pathlib.Path(folder)
+              (out / filename).write_bytes(package)
+              (out / 'latest.json').write_bytes(source.read_bytes())
+              (out / 'notes.txt').write_text(data.get('notes', ''), encoding='utf-8')
+              if existing.returncode != 0:
+                  gh('create',tag,'--draft','--target',os.environ['GITHUB_SHA'],'--title','MG 短剧视频 ' + tag,'--notes-file',str(out/'notes.txt'))
+              gh('upload',tag,str(out/filename),str(out/'latest.json'),'--clobber')
+              gh('edit',tag,'--draft=false','--latest')
+              print('Published ' + tag + ' with verified ZIP and latest.json')

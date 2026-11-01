@@ -50,7 +50,7 @@ jobs:
           manual = data.get('manual_package')
           manual_bytes = None
           if manual:
-              assert manual['filename'] == 'MG插件_v' + v + '.zip'
+              assert manual['filename'] in ('MG插件_v' + v + '.zip', 'MG_plugin_v' + v + '.zip')
               manual_bytes = base64.b64decode((source.parent / (manual['filename'] + '.base64')).read_bytes(), validate=True)
               assert hashlib.sha256(manual_bytes).hexdigest() == manual['sha256']
               with zipfile.ZipFile(io.BytesIO(manual_bytes)) as manual_zip, zipfile.ZipFile(io.BytesIO(package)) as update_zip:
@@ -62,7 +62,21 @@ jobs:
               return subprocess.run(['gh', 'release', *args], check=True, text=True, capture_output=True)
           existing = subprocess.run(['gh','release','view',tag,'--json','isDraft'], text=True, capture_output=True)
           if existing.returncode == 0 and not json.loads(existing.stdout)['isDraft']:
-              print(tag + ' is already published. Published attachments are preserved.')
+              # GitHub normalizes non-ASCII asset names. Match its verified
+              # digest before giving the manual package its portable name.
+              if manual:
+                  repo = os.environ['GH_REPO']
+                  metadata = json.loads(subprocess.check_output(['gh','api','repos/' + repo + '/releases/tags/' + tag], text=True))
+                  matches = [a for a in metadata['assets'] if a.get('digest') == 'sha256:' + manual['sha256']]
+                  assert len(matches) == 1, 'Published manual asset checksum differs'
+                  asset = matches[0]
+                  if asset['name'] != manual['filename']:
+                      subprocess.run(['gh','api','--method','PATCH','repos/' + repo + '/releases/assets/' + str(asset['id']),'-f','name=' + manual['filename']], check=True, capture_output=True)
+              with tempfile.TemporaryDirectory() as folder:
+                  corrected = pathlib.Path(folder) / 'latest.json'
+                  corrected.write_bytes(source.read_bytes())
+                  gh('upload',tag,str(corrected),'--clobber')
+              print(tag + ' release metadata synchronized. Program archives are preserved.')
               raise SystemExit(0)
           with tempfile.TemporaryDirectory() as folder:
               out = pathlib.Path(folder)

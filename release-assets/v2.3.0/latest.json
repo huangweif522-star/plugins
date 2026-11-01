@@ -1,0 +1,7 @@
+{
+  "plugin": "MGImagine_short_drama_v2_0",
+  "version": "2.3.0",
+  "download_url": "https://github.com/huangweif522-star/plugins/releases/download/v2.3.0/MGImagine_short_drama_v2.3.0.zip",
+  "sha256": "12fd9caff4c27ff3793c22263dfc15c3cdf3bf83b6f081d5c031bc8e98fa4aac",
+  "notes": "面板底部新增当前版本和检查插件更新。更新包校验通过后，在字字动画重启时安装，保留设置、模型缓存和任务记录。"
+}
